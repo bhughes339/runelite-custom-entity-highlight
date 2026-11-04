@@ -9,6 +9,7 @@ import java.awt.Shape;
 import java.awt.geom.Area;
 import java.util.BitSet;
 import java.util.List;
+import java.util.regex.MatchResult;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.DecorativeObject;
@@ -95,8 +96,8 @@ class CustomEntityHighlightOverlay extends Overlay
 			if (labelGroup != -1)
 			{
 				GroupStyle labelStyle = styles[labelGroup];
-				String matched = labelStyle.labelSource == LabelSource.MATCH ? plugin.getMatchedText(labelGroup, comp) : null;
-				String name = label(labelStyle, comp.getName(), matched);
+				MatchResult match = labelStyle.usesMatch ? plugin.getMatch(labelGroup, comp) : null;
+				String name = label(labelStyle, comp.getName(), match);
 				renderName(graphics, npc.getCanvasTextLocation(graphics, name, npc.getLogicalHeight() + 40), name, labelStyle.color);
 			}
 		}
@@ -135,8 +136,8 @@ class CustomEntityHighlightOverlay extends Overlay
 			if (labelGroup != -1)
 			{
 				GroupStyle labelStyle = styles[labelGroup];
-				String matched = labelStyle.labelSource == LabelSource.MATCH ? plugin.getMatchedText(labelGroup, comp) : null;
-				String name = label(labelStyle, comp.getName(), matched);
+				MatchResult match = labelStyle.usesMatch ? plugin.getMatch(labelGroup, comp) : null;
+				String name = label(labelStyle, comp.getName(), match);
 				renderName(graphics, object.getCanvasTextLocation(graphics, name, 0), name, labelStyle.color);
 			}
 		}
@@ -266,22 +267,30 @@ class CustomEntityHighlightOverlay extends Overlay
 	}
 
 	/**
-	 * Returns the text to draw above an entity, falling back to its name when the chosen text is missing.
+	 * Returns the text to draw above an entity, falling back to its name when the chosen text is missing or blank.
 	 */
-	private static String label(GroupStyle style, String name, String matchedText)
+	private static String label(GroupStyle style, String name, MatchResult match)
 	{
 		switch (style.labelSource)
 		{
 			case MATCH:
-				if (matchedText != null)
+				if (match != null)
 				{
-					return matchedText;
+					return match.group();
 				}
 				break;
 			case CUSTOM:
-				if (style.customLabel != null)
+				if (style.customLabel != null && !style.usesMatch)
 				{
 					return style.customLabel;
+				}
+				if (match != null)
+				{
+					String expanded = GroupMatcher.expandLabel(style.customLabel, match);
+					if (!expanded.trim().isEmpty())
+					{
+						return expanded;
+					}
 				}
 				break;
 		}
@@ -311,6 +320,8 @@ class CustomEntityHighlightOverlay extends Overlay
 		private final LabelSource labelSource;
 		// Null when the custom label is blank
 		private final String customLabel;
+		// Whether the label is built from the group's match: Match labels, and Custom labels with $ references
+		private final boolean usesMatch;
 
 		private GroupStyle(HighlightGroup group)
 		{
@@ -324,6 +335,8 @@ class CustomEntityHighlightOverlay extends Overlay
 			stroke = new BasicStroke(width);
 			labelSource = group.getLabelSourceOrDefault();
 			customLabel = Strings.emptyToNull(group.getCustomLabel());
+			usesMatch = labelSource == LabelSource.MATCH
+				|| (labelSource == LabelSource.CUSTOM && customLabel != null && GroupMatcher.hasLabelReferences(customLabel));
 		}
 	}
 }

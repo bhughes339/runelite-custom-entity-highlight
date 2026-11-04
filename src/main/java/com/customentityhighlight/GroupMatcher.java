@@ -4,6 +4,7 @@ import com.google.common.base.Strings;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -26,6 +27,9 @@ class GroupMatcher
 
 	// Prefix for entries that stop an entity from matching
 	private static final String EXCLUDE_PREFIX = "-";
+
+	// A reference in a custom label to a group of the match, e.g. $1
+	private static final Pattern LABEL_REFERENCE = Pattern.compile("\\$(\\d)");
 
 	List<String> options;
 	List<String> names;
@@ -211,6 +215,15 @@ class GroupMatcher
 	 */
 	String matchedText(String name, String[] actions)
 	{
+		MatchResult match = match(name, actions);
+		return match != null ? match.group() : null;
+	}
+
+	/**
+	 * Returns the match behind {@link #matchedText}, including what a regex entry's groups captured.
+	 */
+	MatchResult match(String name, String[] actions)
+	{
 		List<String> actionTexts = actionTexts(actions);
 		List<String> nameTexts = nameTexts(name);
 		if (firstMatch(excludedOptionPatterns, actionTexts) != null || firstMatch(excludedNamePatterns, nameTexts) != null)
@@ -218,8 +231,41 @@ class GroupMatcher
 			return null;
 		}
 
-		String action = firstMatch(optionPatterns, actionTexts);
+		MatchResult action = firstMatch(optionPatterns, actionTexts);
 		return action != null ? action : firstMatch(namePatterns, nameTexts);
+	}
+
+	/**
+	 * Whether a custom label refers to any groups of the match.
+	 */
+	static boolean hasLabelReferences(String label)
+	{
+		return LABEL_REFERENCE.matcher(label).find();
+	}
+
+	/**
+	 * Replaces each $0 to $9 in a custom label with the text that group of the match captured, or nothing if it
+	 * captured nothing. $0 is the whole matched text. References to groups the entry doesn't have are left as written.
+	 */
+	static String expandLabel(String label, MatchResult match)
+	{
+		StringBuilder result = new StringBuilder();
+		int last = 0;
+		Matcher reference = LABEL_REFERENCE.matcher(label);
+		while (reference.find())
+		{
+			int group = reference.group(1).charAt(0) - '0';
+			if (group > match.groupCount())
+			{
+				continue;
+			}
+
+			result.append(label, last, reference.start());
+			result.append(Strings.nullToEmpty(match.group(group)));
+			last = reference.end();
+		}
+		result.append(label, last, label.length());
+		return result.toString();
 	}
 
 	/**
@@ -271,17 +317,18 @@ class GroupMatcher
 	}
 
 	/**
-	 * Returns the text matched by the first pattern that matches any of them, or null if none match.
+	 * Returns the match of the first pattern that matches any of the texts, or null if none match.
 	 */
-	private static String firstMatch(List<Pattern> patterns, List<String> texts)
+	private static MatchResult firstMatch(List<Pattern> patterns, List<String> texts)
 	{
 		for (Pattern pattern : patterns)
 		{
 			for (String text : texts)
 			{
-				if (pattern.matcher(text).matches())
+				Matcher matcher = pattern.matcher(text);
+				if (matcher.matches())
 				{
-					return text;
+					return matcher.toMatchResult();
 				}
 			}
 		}

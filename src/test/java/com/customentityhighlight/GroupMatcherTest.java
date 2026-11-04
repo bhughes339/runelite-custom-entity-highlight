@@ -1,6 +1,7 @@
 package com.customentityhighlight;
 
 import java.util.Arrays;
+import java.util.regex.MatchResult;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -81,6 +82,27 @@ public class GroupMatcherTest
 		assertEquals("Bank", matcher("bank", "").matchedText("Banker", new String[]{"<col=ff0000>Bank</col>"}));
 		assertEquals("Banker", matcher("", "banker").matchedText("<col=ffff00>Banker</col>", null));
 		assertNull(matcher("steal", "chest").matchedText("Banker", BANKER_ACTIONS));
+	}
+
+	@Test
+	public void expandsLabelReferences()
+	{
+		MatchResult rocks = matcher("", "/(iron|steel) (rocks)/").match("<col=ffff>Steel rocks</col>", null);
+		assertEquals("Steel ore", GroupMatcher.expandLabel("$1 ore", rocks));
+		assertEquals("rocks: Steel rocks", GroupMatcher.expandLabel("$2: $0", rocks));
+		// $12 is group 1 then a literal 2, and groups the entry doesn't have are left as written
+		assertEquals("Steel2 $3", GroupMatcher.expandLabel("$12 $3", rocks));
+
+		// Groups that captured nothing give nothing
+		MatchResult optional = matcher("/coll(ect)?(-all)?/", "").match("Banker", BANKER_ACTIONS);
+		assertEquals("ect", GroupMatcher.expandLabel("$1$2", optional));
+
+		// Entries that aren't regexes only have $0
+		MatchResult wildcard = matcher("", "bank*").match("Banker", null);
+		assertEquals("Banker $1", GroupMatcher.expandLabel("$0 $1", wildcard));
+
+		assertTrue(GroupMatcher.hasLabelReferences("$1 ore"));
+		assertFalse(GroupMatcher.hasLabelReferences("$ ore"));
 	}
 
 	@Test

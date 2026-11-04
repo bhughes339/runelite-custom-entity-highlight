@@ -307,7 +307,8 @@ class CustomEntityHighlightPanel extends PluginPanel
 		advanced.addAll(addRow(body, row++, "", checkBox("Show labels", group.isShowNames(), group::setShowNames)));
 
 		JTextField customLabel = new JTextField(group.getCustomLabel());
-		customLabel.setToolTipText("Text shown when Label is Custom. Leave blank to show the entity's name.");
+		customLabel.setToolTipText("<html>Text shown when Label is Custom. Leave blank to show the entity's name.<br>"
+			+ "$1 to $9 show what a matching regex entry's groups captured, and $0 the whole matched text.</html>");
 		customLabel.setEnabled(group.getLabelSourceOrDefault() == LabelSource.CUSTOM);
 		onCommit(customLabel, text -> group.setCustomLabel(text.trim()));
 
