@@ -286,6 +286,7 @@ class CustomEntityHighlightPanel extends PluginPanel
 		style.setSelectedItem(group.getStyleOrDefault());
 		style.setToolTipText("<html>Outline: traces the model<br>Hull: border around the model<br>"
 			+ "Area: model filled in, no border<br>Clickbox: the exact area you can click<br>Tile: the tiles it stands on<br>"
+			+ "True tile: an NPC's actual tiles, which its model lags behind while walking<br>"
 			+ "None: no highlight, only the label if Show labels is on</html>");
 		style.addActionListener(e ->
 		{

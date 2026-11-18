@@ -164,6 +164,9 @@ class CustomEntityHighlightOverlay extends Overlay
 			case TILE:
 				renderShape(graphics, npc.getCanvasTilePoly(), style);
 				break;
+			case TRUE_TILE:
+				renderShape(graphics, getTrueTilePoly(npc), style);
+				break;
 			case NONE:
 				// Nothing to draw; the label, if any, is drawn separately
 				break;
@@ -187,6 +190,8 @@ class CustomEntityHighlightOverlay extends Overlay
 				renderShape(graphics, object.getClickbox(), style);
 				break;
 			case TILE:
+			case TRUE_TILE:
+				// Objects don't move, so their true tile is the tile they're drawn on
 				renderShape(graphics, object.getCanvasTilePoly(), style);
 				break;
 			case NONE:
@@ -207,6 +212,29 @@ class CustomEntityHighlightOverlay extends Overlay
 
 		return Perspective.getClickbox(client, worldView, model, npc.getCurrentOrientation(), lp.getX(), lp.getY(),
 			Perspective.getTileHeight(client, lp, worldView.getPlane()));
+	}
+
+	/**
+	 * Returns the area an NPC covers on its server-side tile, which its model can lag behind while it walks.
+	 */
+	private Shape getTrueTilePoly(NPC npc)
+	{
+		WorldView worldView = npc.getWorldView();
+		if (worldView == null)
+		{
+			return null;
+		}
+
+		LocalPoint lp = LocalPoint.fromWorld(worldView, npc.getWorldLocation());
+		if (lp == null)
+		{
+			return null;
+		}
+
+		// The world location is the NPC's south-west tile; the tile area is drawn around its center
+		int size = npc.getComposition().getSize();
+		int offset = Perspective.LOCAL_TILE_SIZE * (size - 1) / 2;
+		return Perspective.getCanvasTileAreaPoly(client, lp.plus(offset, offset), size);
 	}
 
 	private static Shape getConvexHull(TileObject object)

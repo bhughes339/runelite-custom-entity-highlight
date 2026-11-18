@@ -12,6 +12,8 @@ public enum HighlightStyle
 	AREA("Area"),
 	CLICKBOX("Clickbox"),
 	TILE("Tile"),
+	// The tile the server places an NPC on, without the client's walking animation; the same as Tile for objects
+	TRUE_TILE("True tile"),
 	// Draws nothing, so the group only shows labels
 	NONE("None");
 
