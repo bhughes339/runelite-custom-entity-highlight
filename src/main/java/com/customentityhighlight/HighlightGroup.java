@@ -45,6 +45,7 @@ class HighlightGroup
 	private LabelSource labelSource = LabelSource.NAME;
 	// Text shown when labelSource is CUSTOM; blank uses the entity's name
 	private String customLabel = "";
+	private LabelPosition labelPosition = LabelPosition.ABOVE;
 
 	Color getHighlightColorValue()
 	{
@@ -109,5 +110,11 @@ class HighlightGroup
 	{
 		// Null if the saved label source no longer exists
 		return labelSource != null ? labelSource : LabelSource.NAME;
+	}
+
+	LabelPosition getLabelPositionOrDefault()
+	{
+		// Null if the saved label position no longer exists
+		return labelPosition != null ? labelPosition : LabelPosition.ABOVE;
 	}
 }

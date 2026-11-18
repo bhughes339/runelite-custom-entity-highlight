@@ -123,6 +123,15 @@ public class HighlightGroupTest
 		assertEquals(HighlightStyle.OUTLINE, group.getStyleOrDefault());
 		assertEquals(2, group.getBorderWidth());
 		assertEquals(LabelSource.NAME, group.getLabelSourceOrDefault());
+		assertEquals(LabelPosition.ABOVE, group.getLabelPositionOrDefault());
+	}
+
+	@Test
+	public void unknownLabelPositionFallsBackToAbove()
+	{
+		List<HighlightGroup> loaded = gson.fromJson("[{\"labelPosition\":\"NOT_A_POSITION\"}]", GROUP_LIST_TYPE);
+
+		assertEquals(LabelPosition.ABOVE, loaded.get(0).getLabelPositionOrDefault());
 	}
 
 	@Test

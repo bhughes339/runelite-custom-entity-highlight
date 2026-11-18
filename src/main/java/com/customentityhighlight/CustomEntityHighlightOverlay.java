@@ -21,6 +21,7 @@ import net.runelite.api.NPCComposition;
 import net.runelite.api.ObjectComposition;
 import net.runelite.api.Perspective;
 import net.runelite.api.Point;
+import net.runelite.api.Renderable;
 import net.runelite.api.TileObject;
 import net.runelite.api.WallObject;
 import net.runelite.api.WorldView;
@@ -36,6 +37,8 @@ class CustomEntityHighlightOverlay extends Overlay
 {
 	// Used by the area style when the fill color is fully transparent
 	private static final int AREA_FALLBACK_ALPHA = 50;
+	// How far above a model's top an Above label is placed, in local units
+	private static final int LABEL_GAP = 40;
 
 	private final Client client;
 	private final CustomEntityHighlightPlugin plugin;
@@ -98,7 +101,8 @@ class CustomEntityHighlightOverlay extends Overlay
 				GroupStyle labelStyle = styles[labelGroup];
 				MatchResult match = labelStyle.usesMatch ? plugin.getMatch(labelGroup, comp) : null;
 				String name = label(labelStyle, comp.getName(), match);
-				renderName(graphics, npc.getCanvasTextLocation(graphics, name, npc.getLogicalHeight() + 40), name, labelStyle.color);
+				int zOffset = labelZOffset(labelStyle.labelPosition, npc.getLogicalHeight());
+				renderName(graphics, npc.getCanvasTextLocation(graphics, name, zOffset), name, labelStyle);
 			}
 		}
 
@@ -138,7 +142,8 @@ class CustomEntityHighlightOverlay extends Overlay
 				GroupStyle labelStyle = styles[labelGroup];
 				MatchResult match = labelStyle.usesMatch ? plugin.getMatch(labelGroup, comp) : null;
 				String name = label(labelStyle, comp.getName(), match);
-				renderName(graphics, object.getCanvasTextLocation(graphics, name, 0), name, labelStyle.color);
+				int zOffset = labelZOffset(labelStyle.labelPosition, getModelHeight(object));
+				renderName(graphics, object.getCanvasTextLocation(graphics, name, zOffset), name, labelStyle);
 			}
 		}
 
@@ -325,12 +330,70 @@ class CustomEntityHighlightOverlay extends Overlay
 		return Text.removeTags(name);
 	}
 
-	private static void renderName(Graphics2D graphics, Point location, String name, Color color)
+	/**
+	 * Returns how high above the ground to place a label, for a model of the given height.
+	 */
+	private static int labelZOffset(LabelPosition position, int modelHeight)
 	{
-		if (location != null)
+		switch (position)
 		{
-			OverlayUtil.renderTextLocation(graphics, location, name, color);
+			case MIDDLE:
+				return modelHeight / 2;
+			case BELOW:
+				return 0;
+			case ABOVE:
+			default:
+				return modelHeight + LABEL_GAP;
 		}
+	}
+
+	/**
+	 * Returns the height of an object's main model, or 0 if it has none.
+	 */
+	private static int getModelHeight(TileObject object)
+	{
+		Renderable renderable = null;
+		if (object instanceof GameObject)
+		{
+			renderable = ((GameObject) object).getRenderable();
+		}
+		else if (object instanceof GroundObject)
+		{
+			renderable = ((GroundObject) object).getRenderable();
+		}
+		else if (object instanceof WallObject)
+		{
+			renderable = ((WallObject) object).getRenderable1();
+		}
+		else if (object instanceof DecorativeObject)
+		{
+			renderable = ((DecorativeObject) object).getRenderable();
+		}
+		return renderable != null ? renderable.getModelHeight() : 0;
+	}
+
+	private static void renderName(Graphics2D graphics, Point location, String name, GroupStyle style)
+	{
+		if (location == null)
+		{
+			return;
+		}
+
+		// The location is the text's baseline. Move it down so the text is centered on the point (Middle)
+		// or hangs beneath it (Below), instead of sitting on top of it.
+		int ascent = graphics.getFontMetrics().getAscent();
+		switch (style.labelPosition)
+		{
+			case MIDDLE:
+				location = new Point(location.getX(), location.getY() + ascent / 2);
+				break;
+			case BELOW:
+				location = new Point(location.getX(), location.getY() + ascent);
+				break;
+			default:
+				break;
+		}
+		OverlayUtil.renderTextLocation(graphics, location, name, style.color);
 	}
 
 	/**
@@ -346,6 +409,7 @@ class CustomEntityHighlightOverlay extends Overlay
 		private final int feather;
 		private final BasicStroke stroke;
 		private final LabelSource labelSource;
+		private final LabelPosition labelPosition;
 		// Null when the custom label is blank
 		private final String customLabel;
 		// Whether the label is built from the group's match: Match labels, and Custom labels with $ references
@@ -362,6 +426,7 @@ class CustomEntityHighlightOverlay extends Overlay
 			feather = group.getOutlineFeather();
 			stroke = new BasicStroke(width);
 			labelSource = group.getLabelSourceOrDefault();
+			labelPosition = group.getLabelPositionOrDefault();
 			customLabel = Strings.emptyToNull(group.getCustomLabel());
 			usesMatch = labelSource == LabelSource.MATCH
 				|| (labelSource == LabelSource.CUSTOM && customLabel != null && GroupMatcher.hasLabelReferences(customLabel));

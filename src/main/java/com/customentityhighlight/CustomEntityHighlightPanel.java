@@ -352,7 +352,17 @@ class CustomEntityHighlightPanel extends PluginPanel
 			save();
 		});
 		advanced.addAll(addRow(body, row++, "Label", labelSource));
-		advanced.addAll(addRow(body, row, "Text", customLabel));
+		advanced.addAll(addRow(body, row++, "Text", customLabel));
+
+		JComboBox<LabelPosition> labelPosition = new JComboBox<>(LabelPosition.values());
+		labelPosition.setSelectedItem(group.getLabelPositionOrDefault());
+		labelPosition.setToolTipText("Where the label is drawn: above the model, at its middle, or below it");
+		labelPosition.addActionListener(e ->
+		{
+			group.setLabelPosition((LabelPosition) labelPosition.getSelectedItem());
+			save();
+		});
+		advanced.addAll(addRow(body, row, "Position", labelPosition));
 		card.add(body, BorderLayout.CENTER);
 
 		Runnable showAdvanced = () ->
