@@ -4,7 +4,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * What text a group draws above each highlighted entity when it shows names.
+ * What text a group draws as each highlighted entity's label when it shows names.
  */
 @Getter
 @RequiredArgsConstructor

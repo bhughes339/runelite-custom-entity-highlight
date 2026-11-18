@@ -62,6 +62,37 @@ public class HighlightGroupTest
 	}
 
 	@Test
+	public void exportStringLeavesOutPanelState()
+	{
+		HighlightGroup group = new HighlightGroup();
+		group.setEnabled(false);
+		group.setCollapsed(true);
+		group.setAdvancedExpanded(true);
+
+		String json = new String(Base64.getDecoder().decode(group.toExportString(gson)), StandardCharsets.UTF_8);
+		assertFalse(json.contains("\"enabled\""));
+		assertFalse(json.contains("\"collapsed\""));
+		assertFalse(json.contains("\"advancedExpanded\""));
+
+		HighlightGroup imported = HighlightGroup.fromExportString(gson, group.toExportString(gson));
+		assertTrue(imported.isEnabled());
+		assertFalse(imported.isCollapsed());
+		assertFalse(imported.isAdvancedExpanded());
+	}
+
+	@Test
+	public void importResetsPanelStateFromOlderExportStrings()
+	{
+		HighlightGroup imported = HighlightGroup.fromExportString(gson,
+			base64("{\"name\":\"Old\",\"enabled\":false,\"collapsed\":true,\"advancedExpanded\":true}"));
+
+		assertEquals("Old", imported.getName());
+		assertTrue(imported.isEnabled());
+		assertFalse(imported.isCollapsed());
+		assertFalse(imported.isAdvancedExpanded());
+	}
+
+	@Test
 	public void rejectsInvalidExportStrings()
 	{
 		assertNull(HighlightGroup.fromExportString(gson, null));
@@ -92,6 +123,15 @@ public class HighlightGroupTest
 		assertEquals(HighlightStyle.OUTLINE, group.getStyleOrDefault());
 		assertEquals(2, group.getBorderWidth());
 		assertEquals(LabelSource.NAME, group.getLabelSourceOrDefault());
+		assertEquals(LabelPosition.ABOVE, group.getLabelPositionOrDefault());
+	}
+
+	@Test
+	public void unknownLabelPositionFallsBackToAbove()
+	{
+		List<HighlightGroup> loaded = gson.fromJson("[{\"labelPosition\":\"NOT_A_POSITION\"}]", GROUP_LIST_TYPE);
+
+		assertEquals(LabelPosition.ABOVE, loaded.get(0).getLabelPositionOrDefault());
 	}
 
 	@Test

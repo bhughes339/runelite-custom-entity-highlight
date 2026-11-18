@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.IntFunction;
+import java.util.regex.MatchResult;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.AccessLevel;
@@ -131,10 +132,12 @@ public class CustomEntityHighlightPlugin extends Plugin
 	// Definition id -> indexes of the groups whose entries match one of that definition's options
 	private final Map<Integer, BitSet> npcMatches = new HashMap<>();
 	private final Map<Integer, BitSet> objectMatches = new HashMap<>();
+	// Definition id -> indexes of the groups that match it as another player's pet, which can't be interacted with
+	private final Map<Integer, BitSet> otherFollowerMatches = new HashMap<>();
 
-	// Group index and definition id -> the option or name that group matched on, for Match labels
-	private final Map<Long, String> npcMatchedTexts = new HashMap<>();
-	private final Map<Long, String> objectMatchedTexts = new HashMap<>();
+	// Group index and definition id -> that group's match on the option or name, for Match and Custom labels
+	private final Map<Long, MatchResult> npcMatchResults = new HashMap<>();
+	private final Map<Long, MatchResult> objectMatchResults = new HashMap<>();
 
 	@Provides
 	CustomEntityHighlightConfig provideConfig(ConfigManager configManager)
@@ -172,8 +175,9 @@ public class CustomEntityHighlightPlugin extends Plugin
 			objects.clear();
 			npcMatches.clear();
 			objectMatches.clear();
-			npcMatchedTexts.clear();
-			objectMatchedTexts.clear();
+			otherFollowerMatches.clear();
+			npcMatchResults.clear();
+			objectMatchResults.clear();
 			groups = Collections.emptyList();
 			matchers = Collections.emptyList();
 		});
@@ -249,7 +253,7 @@ public class CustomEntityHighlightPlugin extends Plugin
 		if (isNpc)
 		{
 			NPCComposition comp = top.getNpc() != null ? top.getNpc().getTransformedComposition() : null;
-			matches = comp != null ? getMatchingGroups(comp) : null;
+			matches = comp != null ? getMatchingGroups(top.getNpc(), comp) : null;
 		}
 		else
 		{
@@ -414,11 +418,13 @@ public class CustomEntityHighlightPlugin extends Plugin
 	}
 
 	/**
-	 * Returns the indexes of the groups that match the NPC's current form, or null if none do.
+	 * Returns the indexes of the groups that match the NPC in its current form, or null if none do.
 	 */
-	BitSet getMatchingGroups(NPCComposition current)
+	BitSet getMatchingGroups(NPC npc, NPCComposition current)
 	{
-		return nullIfEmpty(npcMatches(current.getId()));
+		// Other players' pets only offer Examine, whatever their definition lists
+		boolean otherFollower = current.isFollower() && npc != client.getFollower();
+		return nullIfEmpty(otherFollower ? otherFollowerMatches(current.getId()) : npcMatches(current.getId()));
 	}
 
 	/**
@@ -430,21 +436,21 @@ public class CustomEntityHighlightPlugin extends Plugin
 	}
 
 	/**
-	 * Returns the option or name, as the game writes it, that the group matched the NPC's current form on, or null if it doesn't match.
+	 * Returns the group's match on the option or name, as the game writes it, of the NPC's current form, or null if it doesn't match.
 	 */
-	String getMatchedText(int group, NPCComposition current)
+	MatchResult getMatch(int group, NPCComposition current)
 	{
-		return npcMatchedTexts.computeIfAbsent(matchKey(group, current.getId()),
-			k -> matchers.get(group).matchedText(current.getName(), current.getActions()));
+		return npcMatchResults.computeIfAbsent(matchKey(group, current.getId()),
+			k -> matchers.get(group).match(current.getName(), current.getActions()));
 	}
 
 	/**
-	 * Returns the option or name, as the game writes it, that the group matched the object's current form on, or null if it doesn't match.
+	 * Returns the group's match on the option or name, as the game writes it, of the object's current form, or null if it doesn't match.
 	 */
-	String getMatchedText(int group, ObjectComposition current)
+	MatchResult getMatch(int group, ObjectComposition current)
 	{
-		return objectMatchedTexts.computeIfAbsent(matchKey(group, current.getId()),
-			k -> matchers.get(group).matchedText(current.getName(), current.getActions()));
+		return objectMatchResults.computeIfAbsent(matchKey(group, current.getId()),
+			k -> matchers.get(group).match(current.getName(), current.getActions()));
 	}
 
 	private static long matchKey(int group, int id)
@@ -492,8 +498,9 @@ public class CustomEntityHighlightPlugin extends Plugin
 			matchers = loadedMatchers;
 			npcMatches.clear();
 			objectMatches.clear();
-			npcMatchedTexts.clear();
-			objectMatchedTexts.clear();
+			otherFollowerMatches.clear();
+			npcMatchResults.clear();
+			objectMatchResults.clear();
 			npcs.clear();
 			objects.clear();
 
@@ -593,6 +600,15 @@ public class CustomEntityHighlightPlugin extends Plugin
 		{
 			NPCComposition comp = client.getNpcDefinition(i);
 			return comp != null ? matchingGroups(comp.getName(), comp.getActions(), comp.isInteractible()) : new BitSet();
+		});
+	}
+
+	private BitSet otherFollowerMatches(int id)
+	{
+		return otherFollowerMatches.computeIfAbsent(id, i ->
+		{
+			NPCComposition comp = client.getNpcDefinition(i);
+			return comp != null ? matchingGroups(comp.getName(), comp.getActions(), false) : new BitSet();
 		});
 	}
 

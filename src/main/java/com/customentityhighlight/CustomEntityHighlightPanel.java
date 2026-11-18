@@ -92,13 +92,6 @@ class CustomEntityHighlightPanel extends PluginPanel
 		title.setForeground(Color.WHITE);
 		header.add(title, BorderLayout.NORTH);
 
-		JLabel help = new JLabel("<html>Each group highlights NPCs and objects that match any of its menu options "
-			+ "or names. Separate entries with commas or new lines; options and names can use * as a wildcard, "
-			+ "e.g. <b>bank*</b>, or a regex in slashes, e.g. <b>/bank(-all)?/</b>. Start an entry with - to never "
-			+ "highlight what it matches, e.g. <b>-bank booth</b>.</html>");
-		help.setFont(FontManager.getRunescapeSmallFont());
-		header.add(help, BorderLayout.CENTER);
-
 		JButton addButton = new JButton("Add group");
 		addButton.setFocusPainted(false);
 		addButton.addActionListener(e ->
@@ -113,9 +106,21 @@ class CustomEntityHighlightPanel extends PluginPanel
 		importButton.setToolTipText("Add a group copied with a group's Export button");
 		importButton.addActionListener(e -> importGroup());
 
-		JPanel headerButtons = new JPanel(new GridLayout(1, 2, 4, 0));
+		JButton expandAllButton = new JButton("Expand all");
+		expandAllButton.setFocusPainted(false);
+		expandAllButton.setToolTipText("Show every group's settings");
+		expandAllButton.addActionListener(e -> setAllCollapsed(false));
+
+		JButton collapseAllButton = new JButton("Collapse all");
+		collapseAllButton.setFocusPainted(false);
+		collapseAllButton.setToolTipText("Hide every group's settings");
+		collapseAllButton.addActionListener(e -> setAllCollapsed(true));
+
+		JPanel headerButtons = new JPanel(new GridLayout(2, 2, 4, 4));
 		headerButtons.add(addButton);
 		headerButtons.add(importButton);
+		headerButtons.add(expandAllButton);
+		headerButtons.add(collapseAllButton);
 		header.add(headerButtons, BorderLayout.SOUTH);
 
 		add(header, BorderLayout.NORTH);
@@ -144,6 +149,16 @@ class CustomEntityHighlightPanel extends PluginPanel
 		plugin.saveGroups(groups);
 	}
 
+	private void setAllCollapsed(boolean collapsed)
+	{
+		for (HighlightGroup group : groups)
+		{
+			group.setCollapsed(collapsed);
+		}
+		save();
+		rebuild();
+	}
+
 	/**
 	 * Adds the group on the clipboard, if it holds one exported by {@link #exportGroup}.
 	 */
@@ -167,8 +182,6 @@ class CustomEntityHighlightPanel extends PluginPanel
 			return;
 		}
 
-		// Show the imported group's settings, however it was left when exported
-		group.setCollapsed(false);
 		groups.add(group);
 		save();
 		rebuild();
@@ -187,19 +200,29 @@ class CustomEntityHighlightPanel extends PluginPanel
 		card.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		card.setBorder(new EmptyBorder(8, 8, 8, 8));
 
-		// Header: collapse toggle, name, rename button and reorder arrows
+		// Header: collapse toggle, enabled toggle, name, rename button and reorder arrows.
+		// The enabled toggle is in the header so it stays usable while the group is collapsed.
 		JPanel header = new JPanel(new BorderLayout(4, 0));
 		header.setOpaque(false);
 
 		JButton collapse = new JButton();
 		collapse.setFocusPainted(false);
-		header.add(collapse, BorderLayout.WEST);
 
 		// Long names are cut off with "...", so the tooltip shows the whole name
 		JLabel name = new JLabel(group.getName());
 		name.setForeground(group.isEnabled() ? Color.WHITE : ColorScheme.MEDIUM_GRAY_COLOR);
 		name.setToolTipText(group.getName());
 		header.add(name, BorderLayout.CENTER);
+
+		JCheckBox enabled = checkBox(null, group.isEnabled(), group::setEnabled);
+		enabled.setToolTipText("Enable or disable this group");
+		enabled.addActionListener(e -> name.setForeground(enabled.isSelected() ? Color.WHITE : ColorScheme.MEDIUM_GRAY_COLOR));
+
+		JPanel headerToggles = new JPanel(new BorderLayout(4, 0));
+		headerToggles.setOpaque(false);
+		headerToggles.add(collapse, BorderLayout.WEST);
+		headerToggles.add(enabled, BorderLayout.CENTER);
+		header.add(headerToggles, BorderLayout.WEST);
 
 		JButton rename = new JButton(new PencilIcon());
 		rename.setFocusPainted(false);
@@ -235,15 +258,10 @@ class CustomEntityHighlightPanel extends PluginPanel
 		header.add(headerButtons, BorderLayout.EAST);
 		card.add(header, BorderLayout.NORTH);
 
-		// Body: enabled toggle, then matching and appearance settings
+		// Body: matching and appearance settings
 		JPanel body = new JPanel(new GridBagLayout());
 		body.setOpaque(false);
 		int row = 0;
-
-		JCheckBox enabled = checkBox("Enabled", group.isEnabled(), group::setEnabled);
-		enabled.setToolTipText("Enable or disable this group");
-		enabled.addActionListener(e -> name.setForeground(enabled.isSelected() ? Color.WHITE : ColorScheme.MEDIUM_GRAY_COLOR));
-		addRow(body, row++, "", enabled);
 
 		JTextArea options = entryList(group.getMenuOptions());
 		onCommit(options, group::setMenuOptions);
@@ -268,6 +286,7 @@ class CustomEntityHighlightPanel extends PluginPanel
 		style.setSelectedItem(group.getStyleOrDefault());
 		style.setToolTipText("<html>Outline: traces the model<br>Hull: border around the model<br>"
 			+ "Area: model filled in, no border<br>Clickbox: the exact area you can click<br>Tile: the tiles it stands on<br>"
+			+ "True tile: an NPC's actual tiles, which its model lags behind while walking<br>"
 			+ "None: no highlight, only the label if Show labels is on</html>");
 		style.addActionListener(e ->
 		{
@@ -281,17 +300,18 @@ class CustomEntityHighlightPanel extends PluginPanel
 		addRow(body, row++, "Fill", colorButton("Fill color", group.getFillColorValue(),
 			color -> group.setFillColor(color.getRGB())));
 
-		// Advanced: rows hidden until expanded; they stay in the same grid so their labels line up
+		// Advanced: rows hidden until expanded; they stay in the same grid so their labels line up.
+		// The header mirrors the group header, with a smaller title.
 		JPanel advancedHeader = new JPanel(new BorderLayout(4, 0));
 		advancedHeader.setOpaque(false);
 		advancedHeader.setBorder(new EmptyBorder(4, 0, 0, 0));
-		JLabel advancedTitle = new JLabel("Advanced");
-		advancedTitle.setFont(FontManager.getRunescapeSmallFont());
-		advancedHeader.add(advancedTitle, BorderLayout.WEST);
 		JButton advancedToggle = new JButton();
 		advancedToggle.setFocusPainted(false);
-		advancedToggle.setMargin(new Insets(0, 4, 0, 4));
-		advancedHeader.add(advancedToggle, BorderLayout.EAST);
+		advancedHeader.add(advancedToggle, BorderLayout.WEST);
+		JLabel advancedTitle = new JLabel("Advanced");
+		advancedTitle.setFont(FontManager.getRunescapeSmallFont());
+		advancedTitle.setForeground(Color.WHITE);
+		advancedHeader.add(advancedTitle, BorderLayout.CENTER);
 		addWideRow(body, row++, advancedHeader);
 
 		List<JComponent> advanced = new ArrayList<>();
@@ -303,7 +323,8 @@ class CustomEntityHighlightPanel extends PluginPanel
 
 		JCheckBox interactable = checkBox("Interactable only", group.isInteractableOnly(), group::setInteractableOnly);
 		interactable.setToolTipText("<html>Only highlight NPCs and objects you can interact with: ones that have "
-			+ "a right-click<br>option other than Examine, e.g. skipping decorative bank booths.</html>");
+			+ "a right-click<br>option other than Examine, e.g. skipping decorative bank booths and other "
+			+ "players' pets.</html>");
 		advanced.addAll(addRow(body, row++, "", interactable));
 
 		JCheckBox swap = checkBox("Swap left-click", group.isSwapLeftClick(), group::setSwapLeftClick);
@@ -314,7 +335,8 @@ class CustomEntityHighlightPanel extends PluginPanel
 		advanced.addAll(addRow(body, row++, "", checkBox("Show labels", group.isShowNames(), group::setShowNames)));
 
 		JTextField customLabel = new JTextField(group.getCustomLabel());
-		customLabel.setToolTipText("Text shown when Label is Custom. Leave blank to show the entity's name.");
+		customLabel.setToolTipText("<html>Text shown when Label is Custom. Leave blank to show the entity's name.<br>"
+			+ "$1 to $9 show what a matching regex entry's groups captured, and $0 the whole matched text.</html>");
 		customLabel.setEnabled(group.getLabelSourceOrDefault() == LabelSource.CUSTOM);
 		onCommit(customLabel, text -> group.setCustomLabel(text.trim()));
 
@@ -330,7 +352,17 @@ class CustomEntityHighlightPanel extends PluginPanel
 			save();
 		});
 		advanced.addAll(addRow(body, row++, "Label", labelSource));
-		advanced.addAll(addRow(body, row, "Text", customLabel));
+		advanced.addAll(addRow(body, row++, "Text", customLabel));
+
+		JComboBox<LabelPosition> labelPosition = new JComboBox<>(LabelPosition.values());
+		labelPosition.setSelectedItem(group.getLabelPositionOrDefault());
+		labelPosition.setToolTipText("Where the label is drawn: above the model, at its middle, or below it");
+		labelPosition.addActionListener(e ->
+		{
+			group.setLabelPosition((LabelPosition) labelPosition.getSelectedItem());
+			save();
+		});
+		advanced.addAll(addRow(body, row, "Position", labelPosition));
 		card.add(body, BorderLayout.CENTER);
 
 		Runnable showAdvanced = () ->
@@ -339,7 +371,7 @@ class CustomEntityHighlightPanel extends PluginPanel
 			{
 				component.setVisible(group.isAdvancedExpanded());
 			}
-			advancedToggle.setText(group.isAdvancedExpanded() ? "-" : "+");
+			advancedToggle.setIcon(new ChevronIcon(group.isAdvancedExpanded()));
 			advancedToggle.setToolTipText(group.isAdvancedExpanded() ? "Hide advanced settings" : "Show advanced settings");
 		};
 		showAdvanced.run();
