@@ -178,19 +178,29 @@ class CustomEntityHighlightPanel extends PluginPanel
 		card.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		card.setBorder(new EmptyBorder(8, 8, 8, 8));
 
-		// Header: collapse toggle, name, rename button and reorder arrows
+		// Header: collapse toggle, enabled toggle, name, rename button and reorder arrows.
+		// The enabled toggle is in the header so it stays usable while the group is collapsed.
 		JPanel header = new JPanel(new BorderLayout(4, 0));
 		header.setOpaque(false);
 
 		JButton collapse = new JButton();
 		collapse.setFocusPainted(false);
-		header.add(collapse, BorderLayout.WEST);
 
 		// Long names are cut off with "...", so the tooltip shows the whole name
 		JLabel name = new JLabel(group.getName());
 		name.setForeground(group.isEnabled() ? Color.WHITE : ColorScheme.MEDIUM_GRAY_COLOR);
 		name.setToolTipText(group.getName());
 		header.add(name, BorderLayout.CENTER);
+
+		JCheckBox enabled = checkBox(null, group.isEnabled(), group::setEnabled);
+		enabled.setToolTipText("Enable or disable this group");
+		enabled.addActionListener(e -> name.setForeground(enabled.isSelected() ? Color.WHITE : ColorScheme.MEDIUM_GRAY_COLOR));
+
+		JPanel headerToggles = new JPanel(new BorderLayout(4, 0));
+		headerToggles.setOpaque(false);
+		headerToggles.add(collapse, BorderLayout.WEST);
+		headerToggles.add(enabled, BorderLayout.CENTER);
+		header.add(headerToggles, BorderLayout.WEST);
 
 		JButton rename = new JButton(new PencilIcon());
 		rename.setFocusPainted(false);
@@ -226,15 +236,10 @@ class CustomEntityHighlightPanel extends PluginPanel
 		header.add(headerButtons, BorderLayout.EAST);
 		card.add(header, BorderLayout.NORTH);
 
-		// Body: enabled toggle, then matching and appearance settings
+		// Body: matching and appearance settings
 		JPanel body = new JPanel(new GridBagLayout());
 		body.setOpaque(false);
 		int row = 0;
-
-		JCheckBox enabled = checkBox(null, group.isEnabled(), group::setEnabled);
-		enabled.setToolTipText("Enable or disable this group");
-		enabled.addActionListener(e -> name.setForeground(enabled.isSelected() ? Color.WHITE : ColorScheme.MEDIUM_GRAY_COLOR));
-		addRow(body, row++, "Enable", enabled);
 
 		JTextArea options = entryList(group.getMenuOptions());
 		onCommit(options, group::setMenuOptions);
