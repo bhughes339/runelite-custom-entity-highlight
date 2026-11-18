@@ -106,9 +106,21 @@ class CustomEntityHighlightPanel extends PluginPanel
 		importButton.setToolTipText("Add a group copied with a group's Export button");
 		importButton.addActionListener(e -> importGroup());
 
-		JPanel headerButtons = new JPanel(new GridLayout(1, 2, 4, 0));
+		JButton expandAllButton = new JButton("Expand all");
+		expandAllButton.setFocusPainted(false);
+		expandAllButton.setToolTipText("Show every group's settings");
+		expandAllButton.addActionListener(e -> setAllCollapsed(false));
+
+		JButton collapseAllButton = new JButton("Collapse all");
+		collapseAllButton.setFocusPainted(false);
+		collapseAllButton.setToolTipText("Hide every group's settings");
+		collapseAllButton.addActionListener(e -> setAllCollapsed(true));
+
+		JPanel headerButtons = new JPanel(new GridLayout(2, 2, 4, 4));
 		headerButtons.add(addButton);
 		headerButtons.add(importButton);
+		headerButtons.add(expandAllButton);
+		headerButtons.add(collapseAllButton);
 		header.add(headerButtons, BorderLayout.SOUTH);
 
 		add(header, BorderLayout.NORTH);
@@ -135,6 +147,16 @@ class CustomEntityHighlightPanel extends PluginPanel
 	private void save()
 	{
 		plugin.saveGroups(groups);
+	}
+
+	private void setAllCollapsed(boolean collapsed)
+	{
+		for (HighlightGroup group : groups)
+		{
+			group.setCollapsed(collapsed);
+		}
+		save();
+		rebuild();
 	}
 
 	/**
